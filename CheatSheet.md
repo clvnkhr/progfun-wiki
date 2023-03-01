@@ -2,17 +2,45 @@
 layout: page
 title: Cheat Sheet
 ---
+This cheat sheet is a heavily modified version of  [https://github.com/lampepfl/progfun-wiki/blob/gh-pages/CheatSheet.md](https://github.com/lampepfl/progfun-wiki/blob/gh-pages/CheatSheet.md). Extra information is taken from the lectures and various links online.
 
-This cheat sheet originated from the forum, credits to Laurent Poulain.
-We copied it and changed or added a few things.
-There are certainly a lot of things that can be improved! If you would like to contribute, you have two options:
+<!-- TOC -->
 
-- Click the "Edit" button on this file on GitHub:
-  [https://github.com/lampepfl/progfun-wiki/blob/gh-pages/CheatSheet.md](https://github.com/lampepfl/progfun-wiki/blob/gh-pages/CheatSheet.md)
-  You can submit a pull request directly from there without checking out the git repository to your local machine.
+- [Evaluation Rules](#evaluation-rules)
+- [Higher order functions](#higher-order-functions)
+- [Currying](#currying)
+- [Classes](#classes)
+  - [Extension Methods (Scala 3)](#extension-methods-scala-3)
+    - [Scala 2 Equivalent: Implicit classes](#scala-2-equivalent-implicit-classes)
+  - [Companion Objects](#companion-objects)
+  - [Auxilliary Constructors](#auxilliary-constructors)
+- [End markers](#end-markers)
+- [Operators](#operators)
+- [Class hierarchies](#class-hierarchies)
+- [Class Organization](#class-organization)
+- [Type Parameters](#type-parameters)
+- [Variance](#variance)
+  - [Mutable arrays are not covariant](#mutable-arrays-are-not-covariant)
+  - [Lists are covariant; this means extra work and caution is needed](#lists-are-covariant-this-means-extra-work-and-caution-is-needed)
+  - [Classes, Traits, Generics, Polymorphism](#classes-traits-generics-polymorphism)
+- [Pattern Matching](#pattern-matching)
+  - [Options](#options)
+  - [Pattern Matching in Anonymous Functions](#pattern-matching-in-anonymous-functions)
+- [Collections](#collections)
+  - [Base Classes](#base-classes)
+  - [Immutable Collections](#immutable-collections)
+  - [Mutable Collections](#mutable-collections)
+  - [Examples](#examples)
+- [Pairs (similar for larger Tuples)](#pairs-similar-for-larger-tuples)
+- [Functions as a class](#functions-as-a-class)
+  - [Functions and methods are different](#functions-and-methods-are-different)
+- [Ordering with `using` clauses](#ordering-with-using-clauses)
+- [Enums (Algebraic Data Types)](#enums-algebraic-data-types)
+- [For-Comprehensions](#for-comprehensions)
+  - [Translation Rules](#translation-rules)
+  - [Example](#example)
 
-- Fork the repository [https://github.com/lampepfl/progfun-wiki](https://github.com/lampepfl/progfun-wiki) and check it out locally. To preview your changes, you need [jekyll](http://jekyllrb.com/). Navigate to your checkout and invoke `jekyll serve`, then open the page [http://localhost:4000/CheatSheet.html](http://localhost:4000/CheatSheet.html).
-
+<!-- /TOC -->
 ## Evaluation Rules
 
 - Call by value: evaluates the function arguments before calling the function
@@ -32,6 +60,7 @@ There are certainly a lot of things that can be improved! If you would like to c
 ## Higher order functions
 
 These are functions that take a function as a parameter or return functions.
+
 ```scala
     // sum takes a function that takes an integer and returns an integer then
     // returns a function that takes two integers and returns an integer
@@ -39,34 +68,39 @@ These are functions that take a function as a parameter or return functions.
       def sumf(a: Int, b: Int): Int = f(a) + f(b)
       sumf
 
-    // same as above. Its type is (Int => Int) => (Int, Int) => Int
-    def sum(f: Int => Int)(a: Int, b: Int): Int =  ...
+    // variant with anonymous function
+    def sum(f: Int => Int): (Int, Int) => Int =
+      (a,b) => f(a) + f(b)
 
-    // Called like this
-    sum((x: Int) => x * x * x)          // Anonymous function, i.e. does not have a name
-    sum(x => x * x * x)                 // Same anonymous function with type inferred
-
-    def cube(x: Int) = x * x * x
-    sum(x => x * x * x)(1, 10) // sum of 1 cubed and 10 cubed
-    sum(cube)(1, 10)           // same as above
+    // desugars to above. 
+    // Its type is (Int => Int) => (Int, Int) => Int
+    def sum(f: Int => Int)(a: Int, b: Int): Int =  f(a) + f(b)
 ```
 
 ## Currying
 
 Converting a function with multiple arguments into a function with a
 single argument that returns another function.
+
 ```scala
     def f(a: Int, b: Int): Int // uncurried version (type is (Int, Int) => Int)
     def f(a: Int)(b: Int): Int // curried version (type is Int => Int => Int)
 ```
+
 To curry an existing function :
+
 ```scala
     val f2: (Int, Int) => Int = f // uncurried version (type is (Int, Int) => Int)
     val f3: Int => Int => Int = f2.curried // transform it to a curried version (type is Int => Int => Int)
     val f4: (Int, Int) => Int = Function.uncurried(f3) // go back to the uncurried version (type is (Int, Int) => Int)
 ```
 
+A partially applied function is more general, as it may not take only a single argument.
+
 ## Classes
+
+The `class` keyword creates both a `type` and a `constructor` method which runs the body of the class.
+
 ```scala
     class MyClass(x: Int, val y: Int,
                           var z: Int):        // Defines a new type MyClass with a constructor
@@ -85,8 +119,58 @@ To curry an existing function :
     new MyClass(1, 2, 3) // creates a new object of type
 ```
 
-`this` references the current object, `assert(<condition>)` issues `AssertionError` if condition
-is not met. See [`scala.Predef`](https://www.scala-lang.org/api/current/scala/Predef$.html) for `require`, `assume` and `assert`.
+- `this` references the current object. In fact 'simple names' like `nb3` desugar to `this.nb3`.
+- `assert(<cond>)` issues `AssertionError` if condition
+is not met. `require(<cond>)` throws a new `IllegalArgumentException`. See [`scala.Predef`](https://www.scala-lang.org/api/current/scala/Predef$.html) for `require`, `assume` and `assert`.
+
+### Extension Methods (Scala 3)
+
+- can add new members of the class but cannot override
+- cannot refer to other class members via `this`
+
+``` scala
+extension (myc: MyClass)
+  def yAdder(myc2: MyClass) = myc.y + myc2.y
+```
+
+is functionally the same as if `yAdder` was defined in the class `MyClass` normally:
+
+```scala
+    class MyClass(x: Int, val y: Int,
+                          var z: Int):  
+    // ...
+    def yAdder(myc2: MyClass) = this.y + myc2.y
+```
+
+These can be put in the companion object or anywhere in scope via `import`.
+
+#### Scala 2 Equivalent: Implicit classes
+
+```scala
+object MyExtensions {
+  implicit class RichInt(val i: Int) extends AnyVal {
+    def square = i * i
+  }
+}
+```
+
+The good thing about Implicit Classes is it is easier to mechanically see the implementation. Its clear that `5.square` is converted by the compiler to `RichInt(5).square`, which is a single line. (However it should be said that this doesn't look like how even [Scala 2 implemented RichInt?](https://stackoverflow.com/questions/7669627/scala-source-implicit-conversion-from-int-to-richint?rq=1))
+
+### Companion Objects
+
+Recall the class body is run during construction. So without an instance, the methods cannot be called. To skip this, in the same source file, put the methods in the companion object,
+
+```scala
+    object MyClass:  
+      def zero = MyClass(0,0,0)
+    MyClass.zero // compiles
+```
+
+ These emulate static methods of Java: in Java, a static method is a method that belongs to a class rather than an instance of a class. This means you can call a static method without creating an object of the class. Static methods are sometimes called class methods.
+
+### Auxilliary Constructors
+
+This is a second constructor defined by overloading the method `this`.
 
 ## End markers
 
@@ -98,15 +182,7 @@ is over using the `end` keyword with the name of the definition:
 ```scala
     class MyClass(a: Int, b: String):
       // body
-    end MyClass
-
-    object MyObject:
-      // body
-    end MyObject
-
-    trait MyTrait:
-      // body
-    end MyTrait
+    end MyClass // can replace `class` with object,trait,def,val...
 
     def myMethod(name: String): Unit =
       println(s"Hello $name")
@@ -119,7 +195,7 @@ is over using the `end` keyword with the name of the definition:
 
 ## Operators
 
-`myObject myMethod 1` is the same as calling `myObject.myMethod(1)`
+`1 + 3` is the same as calling `1.+(3)`.
 
 Operator (i.e. function) names can be alphanumeric, symbolic (e.g. `x1`, `*`, `+?%&`, `vector_++`, `counter_=`)
 
@@ -140,7 +216,15 @@ The associativity of an operator is determined by its last character: Right-asso
 
 Note that assignment operators have lowest precedence. (Read Scala Language Specification 2.9 sections 6.12.3, 6.12.4 for more info)
 
+Methods that begin with an alphabet are not infix by default. You will need to write
+
+```scala
+infix def myop(x: Int,y: Int) = x + y
+x myop y // no error
+```
+
 ## Class hierarchies
+
 ```scala
     abstract class TopLevel:     // abstract class
       def method1(x: Int): Int   // abstract method
@@ -164,6 +248,7 @@ To create a runnable application in Scala:
 ```
 
 or
+
 ```scala
     object Hello extends App:
       println("Hello World")
@@ -181,22 +266,98 @@ or
 - All members of packages `scala` and `java.lang` as well as all members of the object `scala.Predef` are automatically imported.
 
 - Traits are similar to Java interfaces, except they can have non-abstract members:
+
 ```scala
         trait Planar:
-	   ...
+    ...
         class Square extends Shape with Planar
 ```
 
+- In Scala 2, Traits could not have parameters while abstract classes could. In Scala 3 both can, so it is more of a semantic difference? And you cannot inherit from mutliple classes (abstract or not).
 - General object hierarchy:
 
-  - `scala.Any` base type of all types. Has methods `hashCode` and `toString` that can be overridden
-  - `scala.AnyVal` base type of all primitive types. (`scala.Double`, `scala.Float`, etc.)
-  - `scala.AnyRef` base type of all reference types. (alias of `java.lang.Object`, supertype of `java.lang.String`, `scala.List`, any user-defined class)
-  - `scala.Null` is a subtype of any `scala.AnyRef` (`null` is the only instance of type `Null`), and `scala.Nothing` is a subtype of any other type without any instance.
+```mermaid
+graph TD
+    A[Any]
+    AV[AnyVal]
+    AR[AnyRef =:= java.lang.Object]
+    D[Double]
+    F[Float]
+    L[Long]
+    I[Int]
+    S[Short]
+    BYTE[Byte]
+    C[Char]
+    BOOL[Boolean]
+    U[Unit]
+    ITER[Iterable]
+    SEQ[Seq]
+    LIST[List,Vector,...]
+    SET[Set]
+    MAP[Map]
+    STR[java.lang.String]
+    OTHER(other Scala/Java classes...)
+    NULL[Null]
+    NOTHING[Nothing]
+    A --- |>:| AV;
+    A --- |>:| AR;
+
+    AV --- |>:| D; 
+    AV --- |>:| F;
+    AV --- |>:| L;
+    AV --- |>:| I;
+    AV --- |>:| S;
+    AV --- |>:| BYTE;
+    AV --- |>:| C;
+    AV --- |>:| BOOL;
+    AV --- |>:| U;
+
+    BYTE -.-> S-.-> I-.-> L-.-> F-.-> D;
+    C -.-> I;
+
+    AR --- |>:| STR;
+    AR --- |>:| OTHER;
+    AR --- |>:| ITER
+       --- |>:| SEQ
+       --- |>:| LIST;
+    AR --- SET;
+    AR --- MAP; 
+
+    SET --- |>:| NULL;
+    MAP --- |>:| NULL;
+    STR--- |>:| NULL;
+    OTHER--- |>:| NULL;
+    LIST--- |>:| NULL;
+
+    D --- |>:| NOTHING; 
+    F --- |>:| NOTHING;
+    L --- |>:| NOTHING;
+    I --- |>:| NOTHING;
+    S --- |>:| NOTHING;
+    BYTE --- |>:| NOTHING;
+    C --- |>:| NOTHING;
+    BOOL --- |>:| NOTHING;
+    U --- |>:| NOTHING;
+    NULL ---- |>:| NOTHING;
+```
+
+- simple names e.g. `Char` expand to `scala.Char`.
+- Dotted arrow means an implicit conversion is automatically in scope.
+- `scala.Any` base type of all types. Has methods `hashCode` and `toString` that can be overridden
+- `scala.AnyVal` base type of all primitive types. (`scala.Double`, `scala.Float`, etc.)
+- `scala.AnyRef` base type of all reference types. (alias of `java.lang.Object`, supertype of `java.lang.String`, `scala.List`, any user-defined class)
+- `scala.Null` is a subtype of any `scala.AnyRef` (`null` is the only instance of type `Null`), and `scala.Nothing` is a subtype of any other type without any instance.
+  - At the same time, exceptions are all of type `Nothing`.
+- Iterables are case classes, and hence can be pattern matched.
+- The different Seqs differ in performance or memory usage (e.g. `Vector` is an `IndexedSeq` with O(1) lookup. But `List` is only a `LinearSeq`.)
+- The chart is nonexhaustive; e.g. `Option <: IterableOnce`, not `Iterable` (but [there is](https://github.com/scala/scala/blob/6c68c2825e893bb71d6dc78465ac8c6f415cbd93/src/library/scala/Option.scala#L19) an implicit conversion available).
+- There are also literal types: Every literal is also a type, e.g. 1. Its only instance is the literal itself. You can use this to enforce that the argument *must* be 1.
+- Union types: `A|B`, which is a supertype of `A` and `B`. But there is no OO overhead.
 
 ## Type Parameters
 
 Conceptually similar to C++ templates or Java generics. These can apply to classes, traits or functions.
+
 ```scala
     class MyClass[T](arg1: T):
       ...
@@ -206,11 +367,15 @@ Conceptually similar to C++ templates or Java generics. These can apply to class
 ```
 
 It is possible to restrict the type being used, e.g.
+
 ```scala
     def myFct[T <: TopLevel](arg: T): T = ... // T must derive from TopLevel or be TopLevel
     def myFct[T >: Level1](arg: T): T = ...   // T must be a supertype of Level1
     def myFct[T >: Level1 <: TopLevel](arg: T): T = ...
 ```
+
+- Simple types can be inferred by the compiler.
+- Types are erased after compilation, so there can be no runtime checking of types.
 
 ## Variance
 
@@ -220,7 +385,8 @@ If `C[A] <: C[B]`, `C` is covariant
 
 If `C[A] >: C[B]`, `C` is contravariant
 
-Otherwise C is nonvariant
+Otherwise C is nonvariant (also called invariant, which is quite painful to read as a mathematician)
+
 ```scala
     class C[+A]  // C is covariant
     class C[-A]  // C is contravariant
@@ -230,6 +396,7 @@ Otherwise C is nonvariant
 For a function, if `A2 <: A1` and `B1 <: B2`, then `A1 => B1 <: A2 => B2`.
 
 Functions must be contravariant in their argument types and covariant in their result types, e.g.
+
 ```scala
     trait Function1[-T, +U]:
       def apply(x: T): U
@@ -239,13 +406,59 @@ Functions must be contravariant in their argument types and covariant in their r
       def update(x: T) // variance checks fails
 ```
 
-Find out more about variance in
-[lecture 4.4](https://class.coursera.org/progfun-2012-001/lecture/81)
-and [lecture 4.5](https://class.coursera.org/progfun-2012-001/lecture/83)
+(This matches with how a mathematical map transforms under change of variables. The simplest example: if $y=x^2$ then adding 1 to $y$ to get $x^2+1$ moves the graph up but adding 1 to $x$ to get $(x+1)^2$ moves the graph left (despite bigger numbers being on the right; this is covariance).)
+
+### Mutable arrays are not covariant
+
+``` scala
+class IntSet
+class Singleton(s: Int) extends IntSet
+class Empty extends IntSet // Observe that Singleton, Empty <: IntSet. 
+// If arrays were covariant, we would have Array[Singleton] <: Array[IntSet].
+val a: Array[Singleton] = Array(Singleton(1))
+val b: Array[IntSet] = a // compiler errors here.
+b(0) = Empty()
+val s: NonEmpty = a(0)
+```
+
+Variance Checks via the Liskov Substitution Principle: If `A<:B` then everything one can do with a value of type `B`, one should also be able to do with a value of type `A`.
+
+### Lists are covariant; this means extra work and caution is needed
+
+`List` methods `prepend`, `indexOf`, and `contains` need lower type bounds to pass variance checks:
+
+```scala
+trait MyList[+T]: // +T means covariant in T
+  def prepend(x: T): MyList[T] = ::(x,xs) // cannot compile
+  def prepend[U :> T](x: U): MyList[U] = ::(x,xs) // compiles
+case class Nil extends MyList[Nothing]
+case class ::[+T](head: T, tail: MyList[T]) extends MyList[T]
+```
+
+It is natural to prepend and have a `List[Apple]` turn into a `List[Fruit]`. But this also means that `List(1).indexOf("1")` passes the compiler check.
+
+- Covariant type parameters can be lower bounds of function arguments. Contravariant ones can be upper bounds.
+  
+Find out more about variance in [lecture 4.4](https://class.coursera.org/progfun-2012-001/lecture/81) and [lecture 4.5](https://class.coursera.org/progfun-2012-001/lecture/83).
+
+### Classes, Traits, Generics, Polymorphism
+
+Subtypes and generics (the `T` in `List[T]`) are forms of polymorphism: broadly, this is the ability to have one thing be multiple other things at once.
+
+- You can inherit from only one class, but multiple traits.
+
+ ```scala
+ class A extends myClass with myTrait1 with myTrait2
+ // or
+ class A extends myClass, myTrait1, myTrait2
+ ```
+
+ `sealed trait`, `final class`...`opaque` ??
 
 ## Pattern Matching
 
 Pattern matching is used for decomposing data structures:
+
 ```scala
     unknownObject match
       case MyClass(n) => ...
@@ -253,6 +466,7 @@ Pattern matching is used for decomposing data structures:
 ```
 
 Here are a few example patterns
+
 ```scala
     (someList: List[T]) match
       case Nil => ...          // empty list
@@ -275,6 +489,7 @@ types.
 Pattern matching can also be used for `Option` values. Some
 functions (like `Map.get`) return a value of type `Option[T]` which
 is either a value of type `Some[T]` or the value `None`:
+
 ```scala
     val myMap = Map("a" -> 42, "b" -> 43)
 
@@ -291,6 +506,7 @@ Most of the times when you write a pattern match on an option value,
 the same expression can be written more concisely using combinator
 methods of the `Option` class. For example, the function `getMapValue`
 can be written as follows:
+
 ```scala
     def getMapValue(s: String): String =
       myMap.get(s).map("Value found: " + _).getOrElse("No value found")
@@ -299,6 +515,7 @@ can be written as follows:
 ### Pattern Matching in Anonymous Functions
 
 Pattern matches are also used quite often in anonymous functions:
+
 ```scala
     val options: List[Option[Char]] = Some('a') :: None :: Some('b') :: Nil
     val chars: List[Char] = options.map(o => o match {
@@ -308,6 +525,7 @@ Pattern matches are also used quite often in anonymous functions:
 ```
 
 Instead of `o => o match { case ... }`, you can simply write `{case ...}`, so the above example becomes more concise:
+
 ```scala
     val chars: List[Char] = options.map {
       case Some(ch) => ch
@@ -337,13 +555,16 @@ Scala defines several collection classes:
 - [`Set`](https://www.scala-lang.org/api/current/scala/collection/immutable/Set.html) (collection without duplicate elements)
 
 ### Mutable Collections
+
 Most of the immutable collections above have a mutable counterpart, e.g.:
 
 - [`Array`](https://www.scala-lang.org/api/current/scala/Array.html) (Scala arrays are native JVM arrays at runtime, therefore they are very performant)
 - Scala also has mutable maps and sets; these should only be used if there are performance issues with immutable types
 
 ### Examples
+
 NOTE: For the correct code convention of using postfix or not, read [this](https://docs.scala-lang.org/style/method-invocation.html)
+
 ```scala
     val fruitList = List("apples", "oranges", "pears")
     // Alternative syntax for lists
@@ -437,18 +658,44 @@ NOTE: For the correct code convention of using postfix or not, read [this](https
 ```
 
 ## Pairs (similar for larger Tuples)
+
+The pair `(x,y)` is sugar for the case class `Tuple2(x,y)`.
+
 ```scala
     val pair = ("answer", 42)   // type: (String, Int)
     val (label, value) = pair   // label = "answer", value = 42
     pair(0) // "answer"
     pair(1) // 42
+    pair._1 == pair(0) // true
 ```
 
-## Ordering
+## Functions as a class
+
+The type `A => B` is sugar for `Function1(A,B)`:
+
+```scala
+    val f = (x: Int) => x * x
+    // expands to
+    {new Function1[Int, Int]: def apply(x: Int) = x * x}
+    // which expands to
+    {
+      class $anonfun() extends Function1[Int,Int]:
+        def apply(x: Int) = x * x
+      $anonfun()
+    }
+```
+
+### Functions and methods are different
+
+- Functions cannot be overloaded
+- Methods are automatically converted to functions when needed ('$\eta$ expansion')
+
+## Ordering with `using` clauses
 
 There is already a class in the standard library that represents orderings: `scala.math.Ordering[T]` which contains
 comparison functions such as `lt()` and `gt()` for standard types. Types with a single natural ordering should inherit from
 the trait `scala.math.Ordered[T]`.
+
 ```scala
     import math.Ordering
 
@@ -456,6 +703,55 @@ the trait `scala.math.Ordered[T]`.
     msort(fruits)(using Ordering.String)
     msort(fruits)  // the compiler figures out the right ordering
 ```
+
+## Enums (Algebraic Data Types)
+
+In Scala 2, one has to use a pattern to have Enums:
+
+```scala
+trait Expr
+object Expr:
+  case class Var(s: String) extends Expr
+  case class Number(n: Int) extends Expr
+  case class Sum(e1: Expr, e2: Expr) extends Expr
+  case class Prod(e1: Expr, e2: Expr) extends Expr
+```
+
+In Scala 3, we have(essentially: not sure if the compiler uses a trait or an abstract class?) the following sugar:
+
+```scala
+enum Expr:
+  case Var(s: String) 
+  case Number(n: Int) 
+  case Sum(e1: Expr, e2: Expr) 
+  case css Prod(e1: Expr, e2: Expr) 
+```
+
+enums can also be simple values with no parameters, and combine them into one line:
+
+```scala
+enum Color:
+  case Red, Blue, Green
+```
+
+Enums can take parameters and define methods:
+
+```scala
+enum Direction(val dx: Int, val dy: Int):
+  case Right extends Direction( 1, 0)
+  case Up    extends Direction( 0, 1)
+  case Left  extends Direction(-1, 0)
+  case Down  extends Direction( 0,-1)
+
+  def leftTurn = Direction.values((ordinal + 1) % 4)
+end Direction
+
+val r = Direction.Right
+val u =x.LeftTurn // u = Up
+val v = (u.dx, u.dy) // v = (0,1)
+```
+
+`ordinal` zero-indexes the simple (non-parameterised) cases of an Enum; `values` is an immutable array that contains the simple cases in order.
 
 ## For-Comprehensions
 
@@ -470,37 +766,30 @@ The general form is `for (s) yield e`
 - You can use `{ s }` instead of `( s )` if you want to use multiple lines without requiring semicolons
 - `e` is an element of the resulting collection
 
-### Example 1
-```scala
-    // list all combinations of numbers x and y where x is drawn from
-    // 1 to M and y is drawn from 1 to N
-    for (x <- 1 to M; y <- 1 to N)
-      yield (x,y)
-```
-
-is equivalent to
-```scala
-    (1 to M).flatMap(x => (1 to N).map(y => (x, y)))
-```
-
 ### Translation Rules
 
-A for-expression looks like a traditional for loop but works differently internally
+A for-expression looks like a traditional for loop but works differently internally (in particular returns a value like all expressions).
 
-`for (x <- e1) yield e2` is translated to `e1.map(x => e2)`
+Let `e1,e2,e3` be expressions, `f` a filter, and `s` a possibly empty list of expressions and filters. Then
 
-`for (x <- e1 if f; s) yield e2` is translated to `for (x <- e1.withFilter(x => f); s) yield e2`
+- `for (x <- e1) yield e2` is translated to `e1.map(x => e2)`
 
-`for (x <- e1; y <- e2; s) yield e3` is translated to `e1.flatMap(x => for (y <- e2; s) yield e3)`
+- `for (x <- e1 if f; s) yield e2` is translated to `for (x <- e1.withFilter(x => f); s) yield e2`
 
-Note: s is a (potentially empty) sequence of fields (generators and filters)
+- `for (x <- e1; y <- e2; s) yield e3` is translated to `e1.flatMap(x => for (y <- e2; s) yield e3)`
+
+(this is in effect translation of source code at the level of letters, since we need the variable names to line up nicely post-conversion.) Another way to say the conversion:
+
+- all `x <- gen if f` turn into `x <- gen.withFilter(x=>f)`
+- all `x <- gen` turn into `gen.flatMap(x=>...)`s, except the last which deletes the `yield` and becomes a `gen.map(x=>e)`.
 
 This means you can use a for-comprehension for your own type, as long
-as you define `map`, `flatMap` and `filter`.
+as you define `map`, `flatMap` and `filter`: e.g. Stream-type random number generator, monads (e.g. `Option`) and exceptional monads (e.g. `Try`).
 
 For more, see [lecture 6.5](https://class.coursera.org/progfun-2012-001/lecture/111).
 
-### Example 2
+### Example
+
 ```scala
     for
       i <- 1 until n
@@ -510,12 +799,13 @@ For more, see [lecture 6.5](https://class.coursera.org/progfun-2012-001/lecture/
 ```
 
 is equivalent to
+
 ```scala
-    for (i <- 1 until n; j <- 1 until i if isPrime(i + j))
-        yield (i, j)
+    (1 until n).flatMap(i => 
+      (1 until i).withFilter(j => isPrime(i + j)).map(j => 
+        (i, j)
+      )
+    )
 ```
 
-is equivalent to
-```scala
-    (1 until n).flatMap(i => (1 until i).filter(j => isPrime(i + j)).map(j => (i, j)))
-```
+Typeclass, givens, usings, context bounds
