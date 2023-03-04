@@ -10,35 +10,41 @@ This cheat sheet is a heavily modified version of  [https://github.com/lampepfl/
 - [Higher order functions](#higher-order-functions)
 - [Currying](#currying)
 - [Classes](#classes)
-    - [Extension Methods Scala 3](#extension-methods-scala-3)
-        - [Scala 2 Equivalent: Implicit classes](#scala-2-equivalent-implicit-classes)
-    - [Companion Objects](#companion-objects)
-    - [Auxilliary Constructors](#auxilliary-constructors)
+- [Functions as a class](#functions-as-a-class)
+  - [Functions and methods are different](#functions-and-methods-are-different)
+- [Extension Methods (Scala 3)](#extension-methods-scala-3)
+  - [Scala 2 Equivalent: Implicit classes](#scala-2-equivalent-implicit-classes)
+  - [Companion Objects](#companion-objects)
+  - [Auxilliary Constructors](#auxilliary-constructors)
 - [End markers](#end-markers)
 - [Operators](#operators)
 - [Class hierarchies](#class-hierarchies)
+- [The Type Keyword Zoo](#the-type-keyword-zoo)
 - [Class Organization](#class-organization)
 - [Type Parameters](#type-parameters)
 - [Variance](#variance)
-    - [Mutable arrays are not covariant](#mutable-arrays-are-not-covariant)
-    - [Lists are covariant; this means extra work and caution is needed](#lists-are-covariant-this-means-extra-work-and-caution-is-needed)
-    - [Classes, Traits, Generics, Polymorphism](#classes-traits-generics-polymorphism)
+  - [Mutable arrays are not covariant](#mutable-arrays-are-not-covariant)
+  - [Lists are covariant; this means extra work and caution is needed](#lists-are-covariant-this-means-extra-work-and-caution-is-needed)
+  - [Classes, Traits, Generics, Polymorphism](#classes-traits-generics-polymorphism)
 - [Pattern Matching](#pattern-matching)
-    - [Options](#options)
-    - [Pattern Matching in Anonymous Functions](#pattern-matching-in-anonymous-functions)
+  - [Options](#options)
+  - [Pattern Matching in Anonymous Functions](#pattern-matching-in-anonymous-functions)
 - [Collections](#collections)
-    - [Base Classes](#base-classes)
-    - [Immutable Collections](#immutable-collections)
-    - [Mutable Collections](#mutable-collections)
-    - [Examples](#examples)
-- [Pairs similar for larger Tuples](#pairs-similar-for-larger-tuples)
-- [Functions as a class](#functions-as-a-class)
-    - [Functions and methods are different](#functions-and-methods-are-different)
-- [Ordering with using clauses](#ordering-with-using-clauses)
-- [Enums Algebraic Data Types](#enums-algebraic-data-types)
+  - [Base Classes](#base-classes)
+  - [Immutable Collections](#immutable-collections)
+  - [Mutable Collections](#mutable-collections)
+  - [Example methods on collections](#example-methods-on-collections)
+- [Pairs (similar for larger Tuples)](#pairs-similar-for-larger-tuples)
+- [Enums (Algebraic Data Types)](#enums-algebraic-data-types)
 - [For-Comprehensions](#for-comprehensions)
-    - [Translation Rules](#translation-rules)
-    - [Example](#example)
+  - [Translation Rules](#translation-rules)
+  - [Example](#example)
+- [Implicits with `given` and `using`](#implicits-with-given-and-using)
+  - [Example: Ordering with `using` clauses](#example-ordering-with-using-clauses)
+  - [Context bounds](#context-bounds)
+  - [Type Classes](#type-classes)
+    - [Functors with higher-kinded types](#functors-with-higher-kinded-types)
+  - [Context Functions](#context-functions)
 
 <!-- /TOC -->
 ## Evaluation Rules
@@ -123,26 +129,55 @@ The `class` keyword creates both a `type` and a `constructor` method which runs 
 - `assert(<cond>)` issues `AssertionError` if condition
 is not met. `require(<cond>)` throws a new `IllegalArgumentException`. See [`scala.Predef`](https://www.scala-lang.org/api/current/scala/Predef$.html) for `require`, `assume` and `assert`.
 
-### Extension Methods (Scala 3)
+## Functions as a class
+
+The type `A => B` is sugar for `Function1(A,B)`:
+
+```scala
+    val f = (x: Int) => x * x
+    // expands to
+    {new Function1[Int, Int]: def apply(x: Int) = x * x}
+    // which expands to
+    {
+      class $anonfun() extends Function1[Int,Int]:
+        def apply(x: Int) = x * x
+      $anonfun()
+    }
+```
+  
+### Functions and methods are different
+
+- Functions cannot be overloaded
+- Methods are automatically converted to functions when needed ('$\eta$ expansion')
+
+## Extension Methods (Scala 3)
 
 - can add new members of the class but cannot override
 - cannot refer to other class members via `this`
 
 ``` scala
-extension (myc: MyClass)
+class MyClass(x: Int, val y: Int,var z: Int)
+
+extension (myc: MyClass) // no colon
   def yAdder(myc2: MyClass) = myc.y + myc2.y
 ```
 
 is functionally the same as if `yAdder` was defined in the class `MyClass` normally:
 
 ```scala
-    class MyClass(x: Int, val y: Int,
-                          var z: Int):  
-    // ...
+class MyClass(x: Int, val y: Int,var z: Int)
     def yAdder(myc2: MyClass) = this.y + myc2.y
 ```
 
 These can be put in the companion object or anywhere in scope via `import`.
+
+In fact, the compiler converts extension methods into standard defs (with an additional compiler tag):
+
+``` scala
+c1 = MyClass(1,2,3)
+c2 = MyClass(4,5,6)
+c1.yAdder(c2) == yAdder(c1,c2) // true
+```
 
 #### Scala 2 Equivalent: Implicit classes
 
@@ -154,7 +189,9 @@ object MyExtensions {
 }
 ```
 
-The good thing about Implicit Classes is it is easier to mechanically see the implementation. Its clear that `5.square` is converted by the compiler to `RichInt(5).square`, which is a single line. (However it should be said that this doesn't look like how even [Scala 2 implemented RichInt?](https://stackoverflow.com/questions/7669627/scala-source-implicit-conversion-from-int-to-richint?rq=1))
+The good thing about Implicit Classes is it is easier to mechanically see the implementation. Its clear that `5.square` is converted by the compiler to `RichInt(5).square`, which is a single line. (However this doesn't look like how even [Scala 2 implemented RichInt](https://stackoverflow.com/questions/7669627/scala-source-implicit-conversion-from-int-to-richint?rq=1))
+
+In Scala 3, RichInt is implemented via [implicit conversions](https://dotty.epfl.ch/docs/reference/contextual/conversions.html).
 
 ### Companion Objects
 
@@ -253,6 +290,26 @@ or
     object Hello extends App:
       println("Hello World")
 ```
+
+## The Type Keyword Zoo
+
+[Soft keywords](https://docs.scala-lang.org/scala3/reference/soft-modifier.html)
+
+```scala
+val, lazy val, override val, final val, private val
+def, final def, override def, private def
+var, private var
+
+class, abstract class, case class, enum, final class, sealed class, open class
+object, case object, final object, sealed object,
+trait, final trait, sealed trait, transparent trait
+type, opaque type
+
+... extends C1 with T1 with T2  // Scala 2 or 3
+... extends C1, T1, T2          // Scala 3
+```
+
+Info: [Open class (but is it being used...?)](https://docs.scala-lang.org/scala3/book/domain-modeling-oop.html), [sealed vs final and exhaustiveness](https://underscore.io/blog/posts/2015/06/02/everything-about-sealed.html) [transparent trait](https://blog.knoldus.com/introducing-transparent-traits-in-scala-3/)
 
 ## Class Organization
 
@@ -561,7 +618,7 @@ Most of the immutable collections above have a mutable counterpart, e.g.:
 - [`Array`](https://www.scala-lang.org/api/current/scala/Array.html) (Scala arrays are native JVM arrays at runtime, therefore they are very performant)
 - Scala also has mutable maps and sets; these should only be used if there are performance issues with immutable types
 
-### Examples
+### Example methods on collections
 
 NOTE: For the correct code convention of using postfix or not, read [this](https://docs.scala-lang.org/style/method-invocation.html)
 
@@ -669,55 +726,20 @@ The pair `(x,y)` is sugar for the case class `Tuple2(x,y)`.
     pair._1 == pair(0) // true
 ```
 
-## Functions as a class
-
-The type `A => B` is sugar for `Function1(A,B)`:
-
-```scala
-    val f = (x: Int) => x * x
-    // expands to
-    {new Function1[Int, Int]: def apply(x: Int) = x * x}
-    // which expands to
-    {
-      class $anonfun() extends Function1[Int,Int]:
-        def apply(x: Int) = x * x
-      $anonfun()
-    }
-```
-
-### Functions and methods are different
-
-- Functions cannot be overloaded
-- Methods are automatically converted to functions when needed ('$\eta$ expansion')
-
-## Ordering with `using` clauses
-
-There is already a class in the standard library that represents orderings: `scala.math.Ordering[T]` which contains
-comparison functions such as `lt()` and `gt()` for standard types. Types with a single natural ordering should inherit from
-the trait `scala.math.Ordered[T]`.
-
-```scala
-    import math.Ordering
-
-    def msort[T](xs: List[T])(using Ordering[T]) = ...
-    msort(fruits)(using Ordering.String)
-    msort(fruits)  // the compiler figures out the right ordering
-```
-
 ## Enums (Algebraic Data Types)
 
 In Scala 2, one has to use a pattern to have Enums:
 
 ```scala
-trait Expr
+sealed trait Expr
 object Expr:
-  case class Var(s: String) extends Expr
-  case class Number(n: Int) extends Expr
-  case class Sum(e1: Expr, e2: Expr) extends Expr
-  case class Prod(e1: Expr, e2: Expr) extends Expr
+  final case class Var(s: String) extends Expr
+  final case class Number(n: Int) extends Expr
+  final case class Sum(e1: Expr, e2: Expr) extends Expr
+  final case class Prod(e1: Expr, e2: Expr) extends Expr
 ```
 
-In Scala 3, we have(essentially: not sure if the compiler uses a trait or an abstract class?) the following sugar:
+In Scala 3, we have the following sugar:
 
 ```scala
 enum Expr:
@@ -752,6 +774,8 @@ val v = (u.dx, u.dy) // v = (0,1)
 ```
 
 `ordinal` zero-indexes the simple (non-parameterised) cases of an Enum; `values` is an immutable array that contains the simple cases in order.
+
+The precise desugaring [is complicated](https://docs.scala-lang.org/scala3/reference/enums/desugarEnums.html).
 
 ## For-Comprehensions
 
@@ -808,4 +832,204 @@ is equivalent to
     )
 ```
 
-Typeclass, givens, usings, context bounds
+## Implicits with `given` and `using`
+
+Mostly taken from the docs. This is the ability for the compiler to infer a value from the type.
+
+Simple example:
+
+```scala
+given x: Int = 5 
+def summonInt(using x: Int) = x
+summonInt // compiler infers this as summonInt(using x) which evaluates to 5.
+```
+
+a parameter in a using clause is called a context parameter.
+
+`given`s do not need names; if the actual value is needed, you can get it via `summon`:
+
+```scala
+given Int = 5 // given the name given_Int by the compiler
+def summonInt(using Int) = summon(Int) * 2 // converted to given_Int * 2
+summonInt // compiler -> summonInt(using given_Int) -> given_Int * 2 -> 10
+```
+
+### Example: Ordering with `using` clauses
+
+There is already a class in the standard library that represents orderings: `scala.math.Ordering[T]` which contains
+comparison functions such as `lt()` and `gt()` for standard types. This is imported by default via `scala.Ordering[T]`. Types with a single natural ordering should inherit from
+the trait `scala.math.Ordered[T]`.
+
+Below we copy [the example](https://dotty.epfl.ch/docs/reference/contextual/givens.html) [from the docs](https://dotty.epfl.ch/docs/reference/contextual/using-clauses.html), which gives a simpler implementation
+
+```scala
+trait Ord[T]:
+  def compare(x: T, y: T): Int
+  extension (x: T)
+    def < (y: T) = compare(x, y) < 0
+    def > (y: T) = compare(x, y) > 0
+
+given Ord[Int] with
+  def compare(x: Int, y: Int) =
+    if x < y then -1 else if x > y then +1 else 0
+
+given [T](using ord: Ord[T]): Ord[List[T]] with
+  def compare(xs: List[T], ys: List[T]): Int = (xs, ys) match
+    case (Nil, Nil) => 0
+    case (Nil, _) => -1
+    case (_, Nil) => +1
+    case (x :: xs1, y :: ys1) =>
+      val fst = ord.compare(x, y)
+      if fst != 0 then fst else compare(xs1, ys1)
+
+def max[T](x: T, y: T)(using ord: Ord[T]): T =
+  if x < y then y else x
+```
+
+We can `max` use without explicitly writing the using clause:
+
+```scala
+max(7,4)  // compiler replaces with line below
+max(7,4)(using given_Ord_Int)
+```
+
+Now that the given Ord[Int] is in scope, compare has a concrete definition, and the extension methods (`<`) in the trait are in scope.
+
+```scala
+max(List(2),List(3,1)) // List(3,1)
+```
+
+- compiler infers that the type parameter is `List[Int]`
+- compiler finds a given `Ord[List[Int]]`,  because it can find a given `Ord[Int]`.
+- final replacement is:
+
+```scala
+max(List(2),List(3,1))(using given_Ord_List_Int(using given_Ord_Int))
+```
+
+Let's define another function:
+
+```scala
+def maximum[T](xs: List[T])(using Ord[T]): T =
+  xs.reduceLeft(max)
+```
+
+The `given Ord[T]` automatically passed to `maximum` is visible as a `given` to `max`.
+
+### Context bounds
+
+are simply sugar for the above:
+
+```scala
+def maximum[T: Ord](xs: List[T]): T =
+  xs.reduceLeft(max)
+```
+
+More information can be found in [the docs](https://dotty.epfl.ch/docs/reference/contextual/using-clauses.html).
+
+### Type Classes
+
+in Scala 3, type classes are just traits with one or more parameters whose implementations are not defined through the extends keyword, but by given instances.
+
+```scala
+trait SemiGroup[T]:
+  extension (x: T) def combine (y: T): T
+
+trait Monoid[T] extends SemiGroup[T]:
+  def unit: T
+
+object Monoid:
+  def apply[T](using m: Monoid[T]) = m
+
+given Monoid[String] with
+  extension (x: String) def combine (y: String): String = x.concat(y)
+  def unit: String = ""
+
+given Monoid[Int] with
+  extension (x: Int) def combine (y: Int): Int = x + y
+  def unit: Int = 0
+
+def combineAll[T: Monoid](xs: List[T]): T =
+  xs.foldLeft(Monoid[T].unit)(_.combine(_))
+```
+
+#### Functors with [higher-kinded types](https://www.baeldung.com/scala/higher-kinded-types)
+
+For a trait with type parameter `F[_]`, the `[_]` is decorative like `+` in `List[+T]`; objects of this class are of type `List[T]`, and the type defined by `trait myTrait[F[_]]` is `myTrait[F]`. This second-order type dependency is called a higher-kinded type.
+
+```scala
+trait Functor[F[_]]:
+  def map[A, B](x: F[A], f: A => B): F[B]
+
+given Functor[List] with
+  def map[A, B](x: List[A], f: A => B): List[B] =
+    x.map(f) // List already has a `map` method 
+             // but ours has a different signature (used as map(x,f))
+
+// test
+def assertTransformation[F[_]: Functor, A, B](expected: F[B], original: F[A], mapping: A => B): Unit =
+  assert(expected == summon[Functor[F]].map(original, mapping))
+
+assertTransformation(List("a1", "b1"), List("a", "b"), elt => s"${elt}1")
+```
+
+to avoid writing `summon[Functor[F]]` we use an extension method like in the Monoid example
+
+```scala
+trait Functor[F[_]]:
+  extension [A](x: F[A])
+    def map[B](f: A => B): F[B]
+
+given Functor[List] with
+  extension [A](xs: List[A])
+    def map[B](f: A => B): List[B] =
+      xs.map(f) // List already has a `map` method
+
+// test
+def assertTransformation[F[_]: Functor, A, B](expected: F[B], original: F[A], mapping: A => B): Unit =
+  assert(expected == original.map(mapping))
+
+assertTransformation(List("a1", "b1"), List("a", "b"), elt => s"${elt}1")
+```
+
+- The compiler complains at the `def` if `Functor[F]` does not have a method called map.
+- The assertion fails if you redefine the map in the given with e.g. `xs.map(f).reverse`, showing that it does use this map instead of `List`'s predefined `map`.
+
+Other topics in the docs; [the `derives` keyword](https://dotty.epfl.ch/docs/reference/contextual/derivation.html), [by-name context parameters](https://dotty.epfl.ch/docs/reference/contextual/by-name-context-parameters.html)
+
+### Context Functions
+
+Context functions are functions with (only) context parameters. Their types are context function types.
+
+Here is an example of a context function type:
+
+```scala
+type Executable[T] = ExecutionContext ?=> T
+
+given ec: ExecutionContext = ...
+
+def f(x: Int): ExecutionContext ?=> Int = ...
+
+// could be written as follows with the type alias from above
+def f(x: Int): Executable[Int] = ...
+// equivalent to
+def f(x: Int)(using ExecutionContext): Int = ...
+
+f(2) // expands to
+f(2)(using ec)
+```
+
+If a function `g` expects an `A ?=> B` parameter, you can pass it a `B` and the using clause is added for you:
+
+```scala
+def g(arg: Executable[Int]) = ...
+
+g(22)      // is expanded to 
+g((ev: ExecutionContext) ?=> 22)
+
+g(f(2))    // is expanded to 
+g((ev: ExecutionContext) ?=> f(2)(using ev))
+
+g((ctx: ExecutionContext) ?=> f(3))  // is expanded to 
+g((ctx: ExecutionContext) ?=> f(3)(using ctx))
+```
